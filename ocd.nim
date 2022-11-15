@@ -2,9 +2,9 @@ from os import getAppFilename, getAppDir, relativePath, sleep, commandLineParams
 from sequtils import mapIt
 from std/osproc import startProcess, running, kill, close, peekExitCode, poUsePath, poEvalCommand, poParentStreams, poStdErrToStdOut
 from std/strutils import split, parseFloat, toLowerAscii
-from std/terminal import eraseScreen, hideCursor, showCursor
+from std/terminal import eraseScreen, setCursorPos, hideCursor, showCursor
 from std/strformat import `&`
-from std/times import epochTime
+from std/times import Time, epochTime, now, format
 from std/parseopt import initOptParser, next
 from sugar import dup
 
@@ -18,6 +18,7 @@ type Arguments = object
 
 
 proc run(args: Arguments) =
+  echo now().format("hh:mm:ss")
   let process = startProcess(command=args.command, options={poUsePath, poEvalCommand, poParentStreams, poStdErrToStdOut})
 
   if args.echoCommand:
@@ -28,12 +29,11 @@ proc run(args: Arguments) =
   while process.running:
     sleep 500
     if epochTime() - timeStart > args.timeout:
-      echo "\nError: process timeout"
+      echo "\nError: process timeout (-t to change limit)"
       kill process
-      quit(1)
+      break
   let errcode = process.peekExitCode
-  #if errcode != 0:
-  if errcode != 0:
+  if errcode notin [-1,0]:
     echo &"Error:\n{args.command}\nexit code: {errcode}\n"
   close process
 
@@ -115,10 +115,11 @@ proc main =
     quit(1)
 
   stdout.eraseScreen
+  setCursorPos(0,0)
   stdout.flushFile
 
   # keep all up-to-date file timestamps here
-  var modTimes = args.filenames.mapIt( it.getLastModificationTime )
+  var modTimes = newSeq[Time](args.filenames.len)
   # set up the control hook and hide the cursor
   # at the last possible moment before necessary
   setControlCHook onControlC
@@ -130,6 +131,7 @@ proc main =
       if modTimes[file_i] != getLastModificationTime(filename):
         modTimes[file_i] = getLastModificationTime(filename)
         stdout.eraseScreen
+        setCursorPos(0,0)
         stdout.flushFile
         run args
 
