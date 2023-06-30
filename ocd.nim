@@ -30,6 +30,7 @@ proc run(args: Arguments) =
     sleep 500
     if epochTime() - timeStart > args.timeout:
       echo "\nError: process timeout (-t to change limit)"
+      stdout.showCursor
       kill process
       break
   let errcode = process.peekExitCode
@@ -134,6 +135,7 @@ proc main =
         setCursorPos(0,0)
         stdout.flushFile
         run args
+  stdout.showCursor
 
 when isMainModule:
   main()
