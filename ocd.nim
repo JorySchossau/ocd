@@ -125,6 +125,8 @@ proc main =
   # at the last possible moment before necessary
   setControlCHook onControlC
   stdout.hideCursor
+  # get initial modTimes
+  modTimes = args.filenames.mapIt(getLastModificationTime(it))
   # watcher loop
   while true:
     sleep 500
