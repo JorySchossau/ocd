@@ -1,10 +1,10 @@
-from os import getAppFilename, getAppDir, relativePath, sleep, commandLineParams, normalizeExe, getLastModificationTime
+from os import getAppFilename, getAppDir, relativePath, sleep, commandLineParams, normalizeExe, getLastModificationTime, fileExists
 from sequtils import mapIt
 from std/osproc import startProcess, running, kill, close, peekExitCode, poUsePath, poEvalCommand, poParentStreams, poStdErrToStdOut
 from std/strutils import split, parseFloat, toLowerAscii
 from std/terminal import eraseScreen, setCursorPos, hideCursor, showCursor
 from std/strformat import `&`
-from std/times import Time, epochTime, now, format
+from std/times import Time, epochTime, now, format, getTime
 from std/parseopt import initOptParser, next
 from sugar import dup
 
@@ -101,6 +101,19 @@ Options:
   -e,--echo         show the command on every invokation
 """
 
+proc update(filenames: seq[string], modTimes: var seq[Time]): bool =
+  block detectAnyChange:
+    for file_i,filename in filenames:
+      if not fileExists filename: continue
+      if modTimes[file_i] != getLastModificationTime(filename):
+        result = true
+        break detectAnyChange
+  # if any modtimes updated, then update all modtimes
+  if result:
+    for file_i,filename in filenames:
+      if not fileExists filename: continue
+      modTimes[file_i] = getLastModificationTime(filename)
+
 
 proc main =
   let args = getCommandLineArguments()
@@ -126,17 +139,23 @@ proc main =
   setControlCHook onControlC
   stdout.hideCursor
   # get initial modTimes
-  modTimes = args.filenames.mapIt(getLastModificationTime(it))
+  modTimes = args.filenames.mapIt(if fileExists it: getLastModificationTime(it) else: getTime())
   # watcher loop
   while true:
     sleep 500
-    for file_i,filename in args.filenames:
-      if modTimes[file_i] != getLastModificationTime(filename):
-        modTimes[file_i] = getLastModificationTime(filename)
-        stdout.eraseScreen
-        setCursorPos(0,0)
-        stdout.flushFile
-        run args
+    if args.filenames.update(modTimes):
+      stdout.eraseScreen
+      setCursorPos(0,0)
+      stdout.flushFile
+      run args
+    #for file_i,filename in args.filenames:
+    #  if not fileExists filename: continue
+    #  if modTimes[file_i] != getLastModificationTime(filename):
+    #    modTimes[file_i] = getLastModificationTime(filename)
+    #    stdout.eraseScreen
+    #    setCursorPos(0,0)
+    #    stdout.flushFile
+    #    run args
   stdout.showCursor
 
 when isMainModule:
